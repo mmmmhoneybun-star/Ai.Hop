@@ -1248,11 +1248,13 @@
   }
 
   function createModel(vocabSize) {
+    const gen = getGeneration();
+    const lr = Math.max(0.003, 0.01 * Math.pow(0.85, gen - 1));
     const m = tf.sequential();
-    m.add(tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: SEQ_LEN }));
-    m.add(tf.layers.lstm({ units: 64 }));
+    m.add(tf.layers.embedding({ inputDim: vocabSize, outputDim: 48, inputLength: SEQ_LEN }));
+    m.add(tf.layers.lstm({ units: 96 }));
     m.add(tf.layers.dense({ units: vocabSize, activation: "softmax" }));
-    m.compile({ optimizer: tf.train.adam(0.01), loss: "categoricalCrossentropy" });
+    m.compile({ optimizer: tf.train.adam(lr), loss: "categoricalCrossentropy" });
     return m;
   }
 
@@ -1394,17 +1396,26 @@
     return result.trim();
   }
 
+  function sampleFromProbs(probs, temperature) {
+    const scaled = Array.from(probs).map(function (p) {
+      return Math.pow(Math.max(p, 1e-9), 1 / temperature);
+    });
+    const sum = scaled.reduce(function (a, b) { return a + b; }, 0);
+    let r = Math.random() * sum;
+    for (let i = 0; i < scaled.length; i++) {
+      r -= scaled[i];
+      if (r <= 0) return i;
+    }
+    return scaled.length - 1;
+  }
+
   async function generateSampleVisible(promptText, maxChars, role) {
     let seed = (role || "user") + ": " + promptText + "\nai:";
     let result = "";
     for (let i = 0; i < maxChars; i++) {
       const probs = await predictNext(seed);
       renderThinking(topKFromProbs(probs, 5));
-      let nextIdx = 0;
-      let best = -1;
-      for (let j = 0; j < probs.length; j++) {
-        if (probs[j] > best) { best = probs[j]; nextIdx = j; }
-      }
+      const nextIdx = sampleFromProbs(probs, 0.7);
       const nextChar = vocab.chars[nextIdx];
       if (nextChar === "\n") break;
       result += nextChar;
@@ -1451,7 +1462,7 @@
 
     try {
       await model.fit(xs, ys, {
-        epochs: 300,
+        epochs: 500,
         batchSize: 16,
         shuffle: true,
         callbacks: {
