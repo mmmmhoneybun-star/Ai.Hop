@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simple AI</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #10131a;
+    font-family: Georgia, serif;
+    color: #e8e6df;
+    padding: 16px;
+  }
+
+  #chat {
+    width: 100%;
+    max-width: 560px;
+    height: 60vh;
+    background: #171b24;
+    border: 1px solid #2a2f3a;
+    border-radius: 4px;
+    padding: 18px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .row {
+    display: flex;
+    flex-direction: column;
+    max-width: 75%;
+  }
+
+  .label {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    opacity: 0.55;
+    margin-bottom: 3px;
+  }
+
+  .ai {
+    align-self: flex-start;
+    text-align: left;
+  }
+
+  .ai .label { color: #6fffb0; }
+
+  .ai .text {
+    font-family: 'Courier New', monospace;
+    color: #6fffb0;
+  }
+
+  .player {
+    align-self: flex-end;
+    text-align: right;
+  }
+
+  .player .label { color: #ffd166; }
+
+  .player .text {
+    font-family: Georgia, serif;
+    font-style: italic;
+    color: #ffd166;
+  }
+
+  form {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  input {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 4px;
+    border: 1px solid #2a2f3a;
+    background: #171b24;
+    color: #e8e6df;
+    font-size: 16px;
+    font-family: Georgia, serif;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: #ffd166;
+  }
+
+  button {
+    padding: 12px 20px;
+    border-radius: 4px;
+    border: 1px solid #2a2f3a;
+    background: #ffd166;
+    color: #10131a;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #ffdd8a;
+  }
+</style>
+</head>
+<body>
+
+<div id="chat"></div>
+
+<form id="chatForm">
+  <input id="userInput" type="text" placeholder="Type a message..." autocomplete="off">
+  <button type="submit">Send</button>
+</form>
+
+<script>
+  const responses = {
+    "hi": "hi back"
+  };
+
+  function getResponse(message) {
+    const key = message.trim().toLowerCase();
+    return responses[key] || "I don't know how to respond to that yet";
+  }
+
+  const chat = document.getElementById("chat");
+  const form = document.getElementById("chatForm");
+  const input = document.getElementById("userInput");
+
+  function addMessage(text, sender) {
+    const row = document.createElement("div");
+    row.className = "row " + sender;
+
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = sender === "ai" ? "AI" : "YOU";
+
+    const body = document.createElement("div");
+    body.className = "text";
+    body.textContent = text;
+
+    row.appendChild(label);
+    row.appendChild(body);
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const message = input.value;
+    if (!message.trim()) return;
+    addMessage(message, "player");
+    const reply = getResponse(message);
+    setTimeout(function () {
+      addMessage(reply, "ai");
+    }, 200);
+    input.value = "";
+  });
+</script>
+
+</body>
+</html>
