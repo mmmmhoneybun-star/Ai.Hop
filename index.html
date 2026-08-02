@@ -343,7 +343,7 @@
       Your data will be used by Hop Ai for training.<br><br>
       Here is the simple version:<br><br>
       1. What you type here is saved and used to help Hop Ai learn to talk.<br><br>
-      2. Everything you type stays in your browser on this device. Chats are never sent anywhere or shared with anyone. The talking brain itself is downloaded once from the internet, like any app download.<br><br>
+      2. To answer you, your chat messages may be sent securely to an AI service that generates the reply. They are used for nothing else. Your training data, face data, and settings never leave your browser.<br><br>
       3. User data is temporary. It gets cleared each time Hop Ai finishes a learning cycle. Only the admin's data is kept.<br><br>
       4. The camera is only used to check who the admin is, and only if you allow it. It turns off by itself after each scan. No photos are ever saved.<br><br>
       5. Hop Ai can open Roblox and YouTube and search on them, but only on your device and only when you ask it to.<br><br>
@@ -1722,39 +1722,38 @@
     }
 
     const role = unlocked ? "admin" : "user";
+    const personality = localStorage.getItem(PERSONALITY_KEY) || "friendly";
+    const sys = "You are Hop Ai, a small assistant on a website. Keep every reply short, 1 to 2 sentences. Your personality: " + personality + ". " +
+      (role === "admin" ? "You are talking to your admin, call them boss and be loyal." : "You are talking to a regular user, be helpful.") +
+      " Never use profanity, slurs, or adult content.";
+    const messages = [{ role: "system", content: sys }];
+    convoHistory.slice(-6).forEach(function (m) { messages.push(m); });
+    messages.push({ role: "user", content: message });
 
     let reply = null;
 
-    if (window.hopBrain && window.hopBrain.status === "idle") {
-      window.hopBrain.load(function (pct) {
-        document.getElementById("trainingLog").textContent = "Downloading the talking brain: " + pct + "%";
-      });
-      addMessage("My talking brain is downloading, this takes a few minutes the first time. Talk to me again soon.", "ai");
-      return;
+    if (API_WORKER_URL) {
+      reply = await askApi(messages);
     }
 
-    if (window.hopBrain && window.hopBrain.status === "loading") {
-      addMessage("Still downloading my talking brain (" + window.hopBrain.progress + "%). Try again in a bit.", "ai");
-      return;
-    }
-
-    if (window.hopBrain && window.hopBrain.status === "ready") {
-      const personality = localStorage.getItem(PERSONALITY_KEY) || "friendly";
-      const sys = "You are Hop Ai, a small assistant on a website. Keep every reply short, 1 to 2 sentences. Your personality: " + personality + ". " +
-        (role === "admin" ? "You are talking to your admin, call them boss and be loyal." : "You are talking to a regular user, be helpful.") +
-        " Never use profanity, slurs, or adult content.";
-      const messages = [{ role: "system", content: sys }];
-      convoHistory.slice(-6).forEach(function (m) { messages.push(m); });
-      messages.push({ role: "user", content: message });
-      try {
-        reply = await window.hopBrain.generate(messages);
-      } catch (err) {
-        reply = null;
-      }
-      if (reply) {
-        convoHistory.push({ role: "user", content: message });
-        convoHistory.push({ role: "assistant", content: reply });
-        if (convoHistory.length > 12) convoHistory = convoHistory.slice(convoHistory.length - 12);
+    if (!reply && window.hopBrain) {
+      if (window.hopBrain.status === "idle") {
+        window.hopBrain.load(function (pct) {
+          document.getElementById("trainingLog").textContent = "Downloading the backup brain: " + pct + "%";
+        });
+        if (!API_WORKER_URL) {
+          addMessage("My talking brain is downloading, this takes a few minutes the first time. Talk to me again soon.", "ai");
+          return;
+        }
+      } else if (window.hopBrain.status === "loading" && !API_WORKER_URL) {
+        addMessage("Still downloading my talking brain (" + window.hopBrain.progress + "%). Try again in a bit.", "ai");
+        return;
+      } else if (window.hopBrain.status === "ready") {
+        try {
+          reply = await window.hopBrain.generate(messages);
+        } catch (err) {
+          reply = null;
+        }
       }
     }
 
@@ -1773,11 +1772,36 @@
       return;
     }
 
+    convoHistory.push({ role: "user", content: message });
+    convoHistory.push({ role: "assistant", content: reply });
+    if (convoHistory.length > 12) convoHistory = convoHistory.slice(convoHistory.length - 12);
+
     addMessage(reply, "ai", unlocked ? message : null);
     addExample(message, reply, role);
   });
 
   let convoHistory = [];
+
+  const API_WORKER_URL = "https://hop-ai-brain.mmmmhoneybun.workers.dev";
+
+  async function askApi(messages) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(function () { controller.abort(); }, 12000);
+      const res = await fetch(API_WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: messages }),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.reply ? data.reply.trim() : null;
+    } catch (err) {
+      return null;
+    }
+  }
 
   updateDatasetInfo();
   updateStorageInfo();
