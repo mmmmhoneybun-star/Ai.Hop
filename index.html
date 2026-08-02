@@ -6,6 +6,46 @@
 <title>Hop Ai</title>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+<script type="module">
+  import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.1";
+
+  window.hopBrain = {
+    status: "idle",
+    progress: 0,
+    generator: null,
+    async load(onProgress) {
+      if (this.status === "ready" || this.status === "loading") return;
+      this.status = "loading";
+      try {
+        this.generator = await pipeline("text-generation", "HuggingFaceTB/SmolLM2-360M-Instruct", {
+          dtype: "q4",
+          progress_callback: function (p) {
+            if (p.status === "progress" && p.total) {
+              window.hopBrain.progress = Math.round((p.loaded / p.total) * 100);
+              if (onProgress) onProgress(window.hopBrain.progress);
+            }
+          }
+        });
+        this.status = "ready";
+      } catch (err) {
+        this.status = "failed";
+        this.error = err.message;
+      }
+    },
+    async generate(messages) {
+      if (this.status !== "ready") return null;
+      const out = await this.generator(messages, {
+        max_new_tokens: 80,
+        do_sample: true,
+        temperature: 0.7,
+        top_p: 0.9
+      });
+      const convo = out[0].generated_text;
+      const last = convo[convo.length - 1];
+      return (last && last.content ? last.content : "").trim();
+    }
+  };
+</script>
 <style>
   * { box-sizing: border-box; }
 
@@ -94,6 +134,11 @@
   button:disabled { opacity: 0.35; cursor: not-allowed; }
   button.secondary { background: #262b38; color: #e8e6df; }
   button.secondary:hover { background: #323848; }
+
+  #trainBtn, #settingsTrainBtn { background: #3fb950; color: #0b0d12; border-color: #3fb950; }
+  #trainBtn:hover, #settingsTrainBtn:hover { background: #4cc860; }
+  #stopBtn { background: transparent; color: #ffd166; border: 1px solid #ffd166; }
+  #stopBtn:hover { background: rgba(255, 209, 102, 0.12); }
 
   #controls { display: flex; gap: 8px; margin-bottom: 14px; }
 
@@ -298,7 +343,7 @@
       Your data will be used by Hop Ai for training.<br><br>
       Here is the simple version:<br><br>
       1. What you type here is saved and used to help Hop Ai learn to talk.<br><br>
-      2. Everything stays in your browser on this device. Nothing is ever sent anywhere or shared with anyone.<br><br>
+      2. Everything you type stays in your browser on this device. Chats are never sent anywhere or shared with anyone. The talking brain itself is downloaded once from the internet, like any app download.<br><br>
       3. User data is temporary. It gets cleared each time Hop Ai finishes a learning cycle. Only the admin's data is kept.<br><br>
       4. The camera is only used to check who the admin is, and only if you allow it. It turns off by itself after each scan. No photos are ever saved.<br><br>
       5. Hop Ai can open Roblox and YouTube and search on them, but only on your device and only when you ask it to.<br><br>
@@ -327,7 +372,7 @@
   <button id="viewPolicyBtn" type="button" class="secondary" style="width:100%; margin-bottom:6px; font-size:12px;">Privacy Policy</button>
   <button id="clearChatBtn" type="button" class="secondary" style="width:100%; margin-bottom:10px; font-size:12px;">Clear Chat</button>
   <div style="font-family:'Courier New', monospace; font-size:11px; color:#ffd166; margin-bottom:4px;">Customize Hop Ai make its personality.</div>
-  <input id="personalityInput" type="text" placeholder="mean and cool" style="width:100%; padding:6px 8px; font-size:12px; border-radius:4px; border:1px solid #262b38; background:#0b0d12; color:#e8e6df; margin-bottom:6px;">
+  <input id="personalityInput" type="text" style="width:100%; padding:6px 8px; font-size:12px; border-radius:4px; border:1px solid #262b38; background:#0b0d12; color:#e8e6df; margin-bottom:6px;">
   <button id="personalityBtn" type="button" class="secondary" style="width:100%; font-size:12px;">Save Personality</button>
   <div id="personalityStatus" style="font-family:'Courier New', monospace; font-size:11px; color:#8a93a6; margin-top:6px;"></div>
 </div>
@@ -471,6 +516,16 @@
     if (lower === "see my screen" || lower === "share my screen") {
       addMessage("Asking your permission to view your screen...", "ai");
       toggleScreenShare();
+      return true;
+    }
+
+    if (lower === "what time is it" || lower === "whats the time" || lower === "what's the time") {
+      addMessage("It's " + new Date().toLocaleTimeString() + ".", "ai");
+      return true;
+    }
+
+    if (lower === "what day is it" || lower === "whats the date" || lower === "what's the date") {
+      addMessage("It's " + new Date().toLocaleDateString() + ".", "ai");
       return true;
     }
 
@@ -827,7 +882,7 @@
         return;
       }
       if (!hasLearnedFacialRecognition()) {
-        setOwnerStatus("Facial recognition not learned yet. Reach Step 10/10 first.");
+        setOwnerStatus("");
       } else if (getStoredDescriptors()) {
         setOwnerStatus("Face on file. Type Admin Scan Cam to unlock.");
       } else {
@@ -1401,6 +1456,13 @@
         shuffle: true,
         callbacks: {
           onEpochEnd: async function (epoch, logs) {
+            await tf.nextFrame();
+            if (stopRequested) {
+              model.stopTraining = true;
+              logLine("Paused. Progress saved, click Train to continue.");
+              await saveModelState();
+              return;
+            }
             if (!isFinite(logs.loss)) {
               logLine("Loss became invalid (NaN/Infinity) at epoch " + (epoch + 1) + ". Stopping.");
               autoSuspendReason = "Training became numerically unstable (invalid loss). The broken brain will be rebuilt on retrain. All data is kept.";
@@ -1430,10 +1492,6 @@
               reachedMaxStep = true;
               model.stopTraining = true;
               return;
-            }
-            if (stopRequested) {
-              model.stopTraining = true;
-              logLine("Paused. Progress saved, click Train to continue.");
             }
           }
         }
@@ -1526,8 +1584,6 @@
 
   document.getElementById("killBtn").addEventListener("click", async function () {
     if (!controlsOpen()) return;
-    const confirmed = confirm("This permanently wipes all data and stops the AI. Continue?");
-    if (!confirmed) return;
     await performKill("Manually killed by user.");
   });
 
@@ -1667,23 +1723,61 @@
 
     const role = unlocked ? "admin" : "user";
 
-    let reply;
-    if (modelReady && model && vocab) {
-      reply = await generateSampleVisible(message, 30, role);
-      if (!reply) reply = "...";
-      if (containsBlockedTerm(reply)) {
-        addMessage("I can't say that.", "ai");
-        await trySuspend("Hop Ai attempted inappropriate language in reply to: \"" + message.trim() + "\"");
-        return;
-      }
-    } else {
-      reply = "not trained yet";
+    let reply = null;
+
+    if (window.hopBrain && window.hopBrain.status === "idle") {
+      window.hopBrain.load(function (pct) {
+        document.getElementById("trainingLog").textContent = "Downloading the talking brain: " + pct + "%";
+      });
+      addMessage("My talking brain is downloading, this takes a few minutes the first time. Talk to me again soon.", "ai");
+      return;
     }
 
-    const isRealReply = reply !== "not trained yet";
-    addMessage(reply, "ai", unlocked && isRealReply ? message : null);
-    addExample(message, isRealReply ? reply : null, role);
+    if (window.hopBrain && window.hopBrain.status === "loading") {
+      addMessage("Still downloading my talking brain (" + window.hopBrain.progress + "%). Try again in a bit.", "ai");
+      return;
+    }
+
+    if (window.hopBrain && window.hopBrain.status === "ready") {
+      const personality = localStorage.getItem(PERSONALITY_KEY) || "friendly";
+      const sys = "You are Hop Ai, a small assistant on a website. Keep every reply short, 1 to 2 sentences. Your personality: " + personality + ". " +
+        (role === "admin" ? "You are talking to your admin, call them boss and be loyal." : "You are talking to a regular user, be helpful.") +
+        " Never use profanity, slurs, or adult content.";
+      const messages = [{ role: "system", content: sys }];
+      convoHistory.slice(-6).forEach(function (m) { messages.push(m); });
+      messages.push({ role: "user", content: message });
+      try {
+        reply = await window.hopBrain.generate(messages);
+      } catch (err) {
+        reply = null;
+      }
+      if (reply) {
+        convoHistory.push({ role: "user", content: message });
+        convoHistory.push({ role: "assistant", content: reply });
+        if (convoHistory.length > 12) convoHistory = convoHistory.slice(convoHistory.length - 12);
+      }
+    }
+
+    if (!reply && modelReady && model && vocab) {
+      reply = await generateSampleVisible(message, 30, role);
+      if (!reply) reply = "...";
+    }
+
+    if (!reply) {
+      reply = "my brain isn't ready yet, give me a minute";
+    }
+
+    if (containsBlockedTerm(reply)) {
+      addMessage("I can't say that.", "ai");
+      await trySuspend("Hop Ai attempted inappropriate language in reply to: \"" + message.trim() + "\"");
+      return;
+    }
+
+    addMessage(reply, "ai", unlocked ? message : null);
+    addExample(message, reply, role);
   });
+
+  let convoHistory = [];
 
   updateDatasetInfo();
   updateStorageInfo();
@@ -1766,10 +1860,6 @@
   function setPersonality(text) {
     const matched = matchPersonalities(text);
     const status = document.getElementById("personalityStatus");
-    if (matched.length === 0) {
-      status.textContent = "Hop Ai hasn't learned that personality yet.";
-      return;
-    }
     let examples = loadExamples().filter(function (ex) {
       return ex.category !== "personality";
     });
@@ -1782,7 +1872,7 @@
       });
     });
     saveExamples(examples);
-    localStorage.setItem(PERSONALITY_KEY, matched.join(", "));
+    localStorage.setItem(PERSONALITY_KEY, text);
     updateDatasetInfo();
     updateStorageInfo();
     status.textContent = "Personality set: " + matched.join(", ") + ". Talks like this after the next training.";
@@ -1808,6 +1898,14 @@
   document.getElementById("clearChatBtn").addEventListener("click", function () {
     document.getElementById("userSettingsPanel").style.display = "none";
     document.getElementById("chat").innerHTML = "";
+  });
+
+  document.addEventListener("click", function (e) {
+    const panel = document.getElementById("userSettingsPanel");
+    const btn = document.getElementById("userSettingsBtn");
+    if (panel.style.display === "block" && !panel.contains(e.target) && e.target !== btn) {
+      panel.style.display = "none";
+    }
   });
 
   const savedSuspension = localStorage.getItem(SUSPEND_KEY);
