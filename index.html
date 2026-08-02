@@ -1568,6 +1568,7 @@
     localStorage.removeItem(PERSONALITY_KEY);
     localStorage.removeItem(CHAT_LOG_KEY);
     localStorage.removeItem(INCIDENT_LOG_KEY);
+    localStorage.removeItem(BLOCK_KEY);
     nativeRemoveItem(FACE_DESCRIPTOR_KEY);
     try {
       await tf.io.removeModel(MODEL_KEY);
@@ -1583,6 +1584,8 @@
     suspended = false;
     unlocked = false;
     lossHistory = [];
+    convoHistory = [];
+    document.getElementById("chat").innerHTML = "";
 
     document.getElementById("notifBar").style.display = "none";
     document.getElementById("datasetInfo").textContent = "Examples stored: 0 / " + MAX_EXAMPLES;
