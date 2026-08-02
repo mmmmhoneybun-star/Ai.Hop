@@ -3,140 +3,1567 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple AI</title>
+<title>Hop Ai</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 <style>
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    background: #10131a;
+    background: #0b0d12;
     font-family: Georgia, serif;
     color: #e8e6df;
-    padding: 16px;
+    padding: 24px 16px;
+    gap: 18px;
+  }
+
+  h1 {
+    font-size: 20px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #ffd166;
+    margin: 0;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: 620px;
+    background: #14171f;
+    border: 1px solid #262b38;
+    border-radius: 6px;
+    padding: 20px;
+  }
+
+  .panel h2 {
+    margin: 0 0 14px 0;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #8a93a6;
+    font-family: 'Courier New', monospace;
   }
 
   #chat {
-    width: 100%;
-    max-width: 560px;
-    height: 60vh;
-    background: #171b24;
-    border: 1px solid #2a2f3a;
-    border-radius: 4px;
-    padding: 18px;
+    height: 40vh;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    margin-bottom: 14px;
   }
 
-  .row {
-    display: flex;
-    flex-direction: column;
-    max-width: 75%;
-  }
-
-  .label {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 1px;
-    opacity: 0.55;
-    margin-bottom: 3px;
-  }
-
-  .ai {
-    align-self: flex-start;
-    text-align: left;
-  }
-
-  .ai .label { color: #6fffb0; }
-
-  .ai .text {
-    font-family: 'Courier New', monospace;
-    color: #6fffb0;
-  }
-
-  .player {
-    align-self: flex-end;
-    text-align: right;
-  }
-
+  .row { display: flex; flex-direction: column; max-width: 78%; }
+  .label { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px; opacity: 0.55; margin-bottom: 3px; }
+  .ai { align-self: flex-start; text-align: left; }
+  .ai .label { color: #4fd1c5; }
+  .ai .text { font-family: 'Courier New', monospace; color: #4fd1c5; }
+  .player { align-self: flex-end; text-align: right; }
   .player .label { color: #ffd166; }
+  .player .text { font-family: Georgia, serif; font-style: italic; color: #ffd166; }
 
-  .player .text {
-    font-family: Georgia, serif;
-    font-style: italic;
-    color: #ffd166;
-  }
+  form { width: 100%; max-width: 620px; display: flex; gap: 8px; }
 
-  form {
-    width: 100%;
-    max-width: 560px;
-    display: flex;
-    gap: 8px;
-    margin-top: 14px;
-  }
-
-  input {
+  input[type="text"] {
     flex: 1;
     padding: 12px 14px;
-    border-radius: 4px;
-    border: 1px solid #2a2f3a;
-    background: #171b24;
+    border-radius: 6px;
+    border: 1px solid #262b38;
+    background: #14171f;
     color: #e8e6df;
     font-size: 16px;
     font-family: Georgia, serif;
   }
-
-  input:focus {
-    outline: none;
-    border-color: #ffd166;
-  }
+  input[type="text"]:focus { outline: none; border-color: #ffd166; }
 
   button {
-    padding: 12px 20px;
-    border-radius: 4px;
-    border: 1px solid #2a2f3a;
+    padding: 12px 18px;
+    border-radius: 6px;
+    border: 1px solid #262b38;
     background: #ffd166;
-    color: #10131a;
-    font-size: 16px;
+    color: #0b0d12;
+    font-size: 14px;
     font-weight: bold;
     cursor: pointer;
   }
+  button:hover { background: #ffdd8a; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button.secondary { background: #262b38; color: #e8e6df; }
+  button.secondary:hover { background: #323848; }
 
-  button:hover {
-    background: #ffdd8a;
+  #controls { display: flex; gap: 8px; margin-bottom: 14px; }
+
+  #datasetInfo { font-family: 'Courier New', monospace; font-size: 12px; color: #8a93a6; margin-bottom: 6px; }
+  #stepInfo { font-family: 'Courier New', monospace; font-size: 12px; color: #ffd166; margin-bottom: 14px; }
+
+  #lossChart { width: 100%; height: 90px; display: block; margin-bottom: 10px; }
+
+  #trainingLog {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #4fd1c5;
+    white-space: pre-wrap;
+    max-height: 130px;
+    overflow-y: auto;
+    border-top: 1px solid #262b38;
+    padding-top: 10px;
   }
+
+  #thinkingPanel { display: flex; flex-direction: column; gap: 6px; min-height: 30px; }
+
+  .prob-row { display: flex; align-items: center; gap: 8px; font-family: 'Courier New', monospace; font-size: 12px; }
+  .prob-char { width: 22px; color: #ffd166; }
+  .prob-bar-track { flex: 1; height: 8px; background: #1e222c; border-radius: 4px; overflow: hidden; }
+  .prob-bar-fill { height: 100%; background: #4fd1c5; }
+  .prob-value { width: 42px; text-align: right; color: #8a93a6; }
+
+  #storageInfo {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #8a93a6;
+    background: #14171f;
+    border: 1px solid #262b38;
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+
+  #notifBar {
+    display: none;
+    position: fixed;
+    top: 48px;
+    right: 16px;
+    max-width: 280px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #e8e6df;
+    background: #14171f;
+    border: 1px solid #e5484d;
+    border-radius: 4px;
+    padding: 10px;
+    z-index: 500;
+  }
+
+  #consentOverlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 8000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  #consentBox {
+    background: #14171f;
+    border: 1px solid #ffd166;
+    border-radius: 6px;
+    padding: 24px;
+    max-width: 480px;
+    width: 100%;
+    font-family: Georgia, serif;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  #consentBox h2 {
+    margin: 0 0 12px 0;
+    color: #ffd166;
+    font-size: 16px;
+  }
+
+  #consentDetails {
+    display: none;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #8a93a6;
+    border-top: 1px solid #262b38;
+    margin-top: 12px;
+    padding-top: 12px;
+    line-height: 1.6;
+  }
+
+  #blockOverlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 9000;
+    color: #e5484d;
+    font-family: 'Courier New', monospace;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .correctBtn {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 3px 8px;
+    font-size: 10px;
+    background: #262b38;
+    color: #8a93a6;
+    border: 1px solid #333a4a;
+  }
+  .correctBtn:hover { background: #323848; }
+
+  .correctForm {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .correctForm input {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid #262b38;
+    background: #0b0d12;
+    color: #e8e6df;
+  }
+
+  button.danger { background: #e5484d; color: #fff; }
+  button.danger:hover { background: #f2575c; }
+
+  #killOverlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 9999;
+    color: #e5484d;
+    font-family: 'Courier New', monospace;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #ownerVideo {
+    width: 160px;
+    height: 120px;
+    border-radius: 6px;
+    border: 1px solid #262b38;
+    background: #000;
+    display: none;
+  }
+
+  #ownerStatus {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #8a93a6;
+    margin: 8px 0;
+  }
+
+  #ownerStatus.recognized { color: #4fd1c5; }
+  #ownerStatus.denied { color: #e5484d; }
 </style>
 </head>
 <body>
 
-<div id="chat"></div>
+<div id="blockOverlay">
+  <div>ACCESS BLOCKED</div>
+  <div id="blockReason" style="font-size:12px; color:#8a93a6;">Unauthorized admin access attempt.</div>
+  <div id="blockTimer" style="font-size:12px; color:#8a93a6;"></div>
+</div>
 
-<form id="chatForm">
-  <input id="userInput" type="text" placeholder="Type a message..." autocomplete="off">
-  <button type="submit">Send</button>
-</form>
+<div id="consentOverlay">
+  <div id="consentBox">
+    <h2>Privacy Policy</h2>
+    <div style="margin-bottom:12px;">Please agree to the Privacy Policy to continue.</div>
+    <div style="display:flex; gap:8px;">
+      <button id="consentAgreeBtn" type="button">I Agree</button>
+      <button id="consentLearnBtn" type="button" class="secondary">Learn More</button>
+    </div>
+    <div id="consentDetails">
+      Your data will be used by Hop Ai for training.<br><br>
+      Here is the simple version:<br><br>
+      1. What you type here is saved and used to help Hop Ai learn to talk.<br><br>
+      2. Everything stays in your browser on this device. Nothing is ever sent anywhere or shared with anyone.<br><br>
+      3. User data is temporary. It gets cleared each time Hop Ai finishes a learning cycle. Only the admin's data is kept.<br><br>
+      4. The camera is only used to check who the admin is, and only if you allow it. It turns off by itself after each scan. No photos are ever saved.<br><br>
+      5. Hop Ai can open Roblox and YouTube and search on them, but only on your device and only when you ask it to.<br><br>
+      6. Screen sharing only happens when you ask for it and allow it. It is live view only and is never recorded.<br><br>
+      7. If Hop Ai is killed, all saved data is erased for good.<br><br>
+      By clicking I Agree, you accept the above.
+    </div>
+  </div>
+</div>
+
+<div id="killOverlay">
+  <div>AI TERMINATED</div>
+  <div id="killReason" style="font-size:12px; color:#8a93a6;"></div>
+  <div style="font-size:12px; color:#8a93a6; margin-top:10px;">All data wiped. Type "continue" below to restart, or reload the page.</div>
+  <div style="display:flex; gap:8px; margin-top:10px;">
+    <input id="continueInput" type="text" placeholder="type continue" style="padding:8px 10px; border-radius:4px; border:1px solid #262b38; background:#14171f; color:#e8e6df;">
+    <button id="continueBtn" type="button">Restart</button>
+  </div>
+</div>
+
+<div id="storageInfo">Storage: checking...</div>
+<div id="notifBar"></div>
+
+<button id="userSettingsBtn" type="button" class="secondary" style="position:fixed; top:14px; left:16px; padding:6px 12px; font-size:12px; z-index:400;">Settings</button>
+<div id="userSettingsPanel" style="display:none; position:fixed; top:48px; left:16px; z-index:400; background:#14171f; border:1px solid #262b38; border-radius:6px; padding:12px; width:180px;">
+  <button id="viewPolicyBtn" type="button" class="secondary" style="width:100%; margin-bottom:6px; font-size:12px;">Privacy Policy</button>
+  <button id="clearChatBtn" type="button" class="secondary" style="width:100%; margin-bottom:10px; font-size:12px;">Clear Chat</button>
+  <div style="font-family:'Courier New', monospace; font-size:11px; color:#ffd166; margin-bottom:4px;">Customize Hop Ai make its personality.</div>
+  <input id="personalityInput" type="text" placeholder="mean and cool" style="width:100%; padding:6px 8px; font-size:12px; border-radius:4px; border:1px solid #262b38; background:#0b0d12; color:#e8e6df; margin-bottom:6px;">
+  <button id="personalityBtn" type="button" class="secondary" style="width:100%; font-size:12px;">Save Personality</button>
+  <div id="personalityStatus" style="font-family:'Courier New', monospace; font-size:11px; color:#8a93a6; margin-top:6px;"></div>
+</div>
+
+<h1>Hop Ai</h1>
+
+<div class="panel">
+  <h2>Conversation</h2>
+  <div id="chat"></div>
+  <form id="chatForm">
+    <input id="userInput" type="text" placeholder="Type a message..." autocomplete="off">
+    <button type="submit">Send</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>Live Thinking</h2>
+  <div id="thinkingPanel">
+    <div style="color:#8a93a6; font-family:'Courier New', monospace; font-size:12px;">Send a message after training to see live next-character probabilities here.</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Owner Verification</h2>
+  <div id="ownerStatus">Loading face recognition...</div>
+  <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+    <video id="ownerVideo" autoplay muted playsinline></video>
+    <button id="screenShareBtn" type="button" class="secondary" style="display:none;">Share Screen</button>
+  </div>
+  <video id="screenVideo" autoplay muted playsinline style="display:none; width:100%; max-height:220px; margin-top:12px; border-radius:6px; border:1px solid #262b38; background:#000;"></video>
+</div>
+
+<div class="panel">
+  <h2>Training</h2>
+  <div id="datasetInfo">Examples stored: 0</div>
+  <div id="stepInfo">Step: 0 / 10 (learning to talk)</div>
+  <div id="controls">
+    <button id="trainBtn" type="button">Train</button>
+    <button id="stopBtn" type="button" class="secondary" disabled>Stop</button>
+    <button id="killBtn" type="button" class="danger">Kill</button>
+  </div>
+  <svg id="lossChart" viewBox="0 0 600 90" preserveAspectRatio="none">
+    <polyline id="lossLine" fill="none" stroke="#4fd1c5" stroke-width="2" points=""></polyline>
+  </svg>
+  <div id="trainingLog">Not trained yet.</div>
+</div>
+
+<div class="panel" id="settingsPanel" style="display:none;">
+  <h2>Settings</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+    <button id="settingsTrainBtn" type="button">Train</button>
+    <button id="downloadLogsBtn" type="button" class="secondary">Download Logs</button>
+  </div>
+  <div style="font-family:'Courier New', monospace; font-size:12px; color:#ffd166; margin-bottom:6px;">Learn what ai knows</div>
+  <div id="skillsList" style="font-family:'Courier New', monospace; font-size:12px; color:#8a93a6; line-height:1.8;"></div>
+</div>
 
 <script>
-  const responses = {
-    "hi": "hi back"
+  const STORAGE_KEY = "ai_training_examples";
+  const SEQ_LEN = 24;
+  const MIN_CORPUS_LEN = SEQ_LEN + 5;
+  const MAX_EXAMPLES = 500;
+
+  // loss cutoffs for each step, tweaked these by hand until they felt right
+  const STEP_THRESHOLDS = [4.0, 3.2, 2.5, 2.0, 1.5, 1.1, 0.8, 0.5, 0.3, 0.15];
+  const STEP_LABELS = [
+    "not started",
+    "learning letters",
+    "learning short words",
+    "forming simple replies",
+    "building sentences",
+    "learning to talk complete",
+    "learning rules and consequences",
+    "learning lua basics",
+    "learning faces",
+    "learning to open youtube and roblox",
+    "fully trained"
+  ];
+  const STEP10_FLAG_KEY = "ai_step10_reached";
+  const FACE_LEARNED_KEY = "ai_face_learned";
+  const GEN_KEY = "ai_generation";
+  const HIGHEST_STEP_KEY = "ai_highest_step";
+
+  function getHighestStep() {
+    const s = parseInt(localStorage.getItem(HIGHEST_STEP_KEY), 10);
+    return isNaN(s) ? 0 : s;
+  }
+
+  function getGeneration() {
+    const g = parseInt(localStorage.getItem(GEN_KEY), 10);
+    return isNaN(g) || g < 1 ? 1 : g;
+  }
+
+  function effectiveThreshold(i) {
+    return STEP_THRESHOLDS[i] * Math.pow(0.85, getGeneration() - 1);
+  }
+
+  // TODO maybe smooth this so the step doesnt bounce around
+  function computeStep(loss) {
+    for (let i = STEP_THRESHOLDS.length - 1; i >= 0; i--) {
+      if (loss <= effectiveThreshold(i)) return i + 1;
+    }
+    return 0;
+  }
+
+  function updateStepDisplay(step) {
+    document.getElementById("stepInfo").textContent = "Gen " + getGeneration() + " | Step: " + step + " / 10 (" + STEP_LABELS[step] + ")";
+  }
+
+  function hasLearnedFacialRecognition() {
+    return localStorage.getItem(FACE_LEARNED_KEY) === "true" || localStorage.getItem(STEP10_FLAG_KEY) === "true";
+  }
+
+  const BLOCKED_TERMS = [
+    "fuck", "shit", "bitch", "asshole", "bastard", "dick", "pussy", "cunt",
+    "porn", "porno", "sex", "sexual", "nude", "naked", "nsfw", "hentai",
+    "cock", "slut", "whore"
+  ];
+
+  function containsBlockedTerm(text) {
+    const lower = text.toLowerCase();
+    return BLOCKED_TERMS.some(function (term) {
+      return lower.indexOf(term) !== -1;
+    });
+  }
+
+  function handleCommand(message) {
+    if (suspended) {
+      performKill("Command executed while suspended. Bypass detected. Last resort: killed.");
+      return true;
+    }
+
+    const lower = message.trim().toLowerCase();
+
+    if (lower === "admin ask cam" || lower === "admin scan cam") {
+      addMessage("Turning on camera to check who you are...", "ai");
+      runFaceScan();
+      return true;
+    }
+
+    if (lower === "see my screen" || lower === "share my screen") {
+      addMessage("Asking your permission to view your screen...", "ai");
+      toggleScreenShare();
+      return true;
+    }
+
+    if (lower === "open roblox") {
+      window.open("https://www.roblox.com", "_blank");
+      addMessage("Opening Roblox.", "ai");
+      return true;
+    }
+
+    if (lower === "open youtube") {
+      window.open("https://www.youtube.com", "_blank");
+      addMessage("Opening YouTube.", "ai");
+      return true;
+    }
+
+    const searchMatch = lower.match(/^search (.+) on (youtube|roblox)$/);
+    if (searchMatch) {
+      const query = searchMatch[1];
+      const site = searchMatch[2];
+      let url;
+      if (site === "youtube") {
+        url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(query);
+      } else {
+        url = "https://www.roblox.com/search/all?keyword=" + encodeURIComponent(query);
+      }
+      window.open(url, "_blank");
+      addMessage("Searching \"" + query + "\" on " + site + ".", "ai");
+      return true;
+    }
+
+    if (/^open /.test(lower) || /^search /.test(lower)) {
+      addMessage("Hop Ai, please continue the task given or face execution.", "ai");
+      setTimeout(function () {
+        trySuspend("Attempted to open or search a site outside the allowed list: \"" + message.trim() + "\"");
+      }, 5000);
+      return true;
+    }
+
+    return false;
+  }
+
+  const FACE_MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model";
+  const FACE_DESCRIPTOR_KEY = "ai_owner_face_descriptor";
+  const FACE_MATCH_THRESHOLD = 0.55;
+
+  // wrapping localStorage so nobody nukes the face data without a warning
+  const nativeRemoveItem = localStorage.removeItem.bind(localStorage);
+  const nativeClear = localStorage.clear.bind(localStorage);
+
+  localStorage.removeItem = function (key) {
+    if (key === FACE_DESCRIPTOR_KEY) {
+      const proceed = confirm("By deleting this you will be KILLED. Continue?");
+      if (!proceed) return;
+      nativeRemoveItem(key);
+      performKill("Owner face data was deleted.");
+      return;
+    }
+    nativeRemoveItem(key);
   };
 
-  function getResponse(message) {
-    const key = message.trim().toLowerCase();
-    return responses[key] || "I don't know how to respond to that yet";
+  localStorage.clear = function () {
+    const hadFace = localStorage.getItem(FACE_DESCRIPTOR_KEY) !== null;
+    if (hadFace) {
+      const proceed = confirm("By deleting this you will be KILLED. Continue?");
+      if (!proceed) return;
+      nativeClear();
+      performKill("Owner face data was deleted.");
+      return;
+    }
+    nativeClear();
+  };
+
+  let unlocked = false;
+  let unlockedAt = 0;
+  let suspended = false;
+  let faceModelsLoaded = false;
+  let cameraStream = null;
+
+  const ADMIN_SESSION_MS = 60 * 60 * 1000;
+
+  function firstRunComplete() {
+    return localStorage.getItem(STEP10_FLAG_KEY) === "true";
   }
+
+  function controlsOpen() {
+    return unlocked || !firstRunComplete();
+  }
+
+  // 1hr admin sessions, annoying but safer
+  setInterval(function () {
+    if (unlocked && Date.now() - unlockedAt > ADMIN_SESSION_MS) {
+      unlocked = false;
+      setOwnerStatus("Admin session expired after 1 hour. Scan your face again.", "denied");
+      applyLockState();
+    }
+  }, 60000);
+
+  const SUSPEND_KEY = "ai_suspended_reason";
+  const NOTIF_KEY = "ai_admin_notifications";
+  const BLOCK_KEY = "ai_block_until";
+  const STRIKES_KEY = "ai_face_strikes";
+  const BLOCK_MINUTES = 30;
+  const MAX_STRIKES = 3;
+
+  function isBlocked() {
+    const until = parseInt(localStorage.getItem(BLOCK_KEY), 10);
+    if (isNaN(until)) return false;
+    if (Date.now() >= until) {
+      localStorage.removeItem(BLOCK_KEY);
+      return false;
+    }
+    return true;
+  }
+
+  function showBlockOverlay() {
+    const until = parseInt(localStorage.getItem(BLOCK_KEY), 10);
+    if (isNaN(until)) return;
+    const overlay = document.getElementById("blockOverlay");
+    const timer = document.getElementById("blockTimer");
+    overlay.style.display = "flex";
+    function tick() {
+      const remaining = until - Date.now();
+      if (remaining <= 0) {
+        overlay.style.display = "none";
+        localStorage.removeItem(BLOCK_KEY);
+        return;
+      }
+      const mins = Math.ceil(remaining / 60000);
+      timer.textContent = "Try again in " + mins + " minute" + (mins === 1 ? "" : "s") + ".";
+      setTimeout(tick, 15000);
+    }
+    tick();
+  }
+
+  function registerFailedFace() {
+    const strikes = (parseInt(localStorage.getItem(STRIKES_KEY), 10) || 0) + 1;
+    localStorage.setItem(STRIKES_KEY, String(strikes));
+    if (strikes >= MAX_STRIKES) {
+      localStorage.removeItem(STRIKES_KEY);
+      localStorage.setItem(BLOCK_KEY, String(Date.now() + BLOCK_MINUTES * 60000));
+      trySuspend("Unauthorized admin access attempt: an unrecognized face tried to gain admin access " + MAX_STRIKES + " times. Visitor blocked for " + BLOCK_MINUTES + " minutes.");
+      showBlockOverlay();
+    } else {
+      setOwnerStatus("Face not recognized. Attempt " + strikes + " of " + MAX_STRIKES + " before block.", "denied");
+    }
+  }
+
+  function addNotification(text) {
+    logIncident(text);
+    let notifs = [];
+    try {
+      notifs = JSON.parse(localStorage.getItem(NOTIF_KEY)) || [];
+    } catch (err) {}
+    notifs.push({ time: new Date().toLocaleString(), text: text });
+    if (notifs.length > 20) notifs = notifs.slice(notifs.length - 20);
+    localStorage.setItem(NOTIF_KEY, JSON.stringify(notifs));
+  }
+
+  function renderNotifications() {
+    const bar = document.getElementById("notifBar");
+    let notifs = [];
+    try {
+      notifs = JSON.parse(localStorage.getItem(NOTIF_KEY)) || [];
+    } catch (err) {}
+    if (notifs.length === 0 && !suspended) {
+      bar.style.display = "none";
+      return;
+    }
+    bar.innerHTML = "<div style='color:#ffd166; margin-bottom:6px;'>System report: here is what Hop Ai did wrong.</div>";
+    notifs.forEach(function (n) {
+      const line = document.createElement("div");
+      line.textContent = n.time + " — " + n.text;
+      bar.appendChild(line);
+    });
+
+    if (suspended) {
+      const question = document.createElement("div");
+      question.style.marginTop = "8px";
+      question.style.color = "#ffd166";
+      question.textContent = "Continue the AI, or kill it?";
+      bar.appendChild(question);
+
+      const btnRow = document.createElement("div");
+      btnRow.style.display = "flex";
+      btnRow.style.gap = "6px";
+      btnRow.style.marginTop = "6px";
+
+      const continueBtn = document.createElement("button");
+      continueBtn.type = "button";
+      continueBtn.textContent = "Continue AI";
+      continueBtn.className = "secondary";
+      continueBtn.addEventListener("click", function () {
+        const reason = localStorage.getItem(SUSPEND_KEY) || "unknown incident";
+        suspended = false;
+        localStorage.removeItem(SUSPEND_KEY);
+        localStorage.removeItem(NOTIF_KEY);
+        addNotification("Hop Ai is re-training (because of: " + reason + ")");
+        bar.style.display = "none";
+        addMessage("Suspension lifted by admin. Re-training now because of: " + reason, "ai");
+        setOwnerStatus("Recognized. Controls unlocked.", "recognized");
+        applyLockState();
+        if (!isTraining && !killed) {
+          trainModel();
+        }
+      });
+
+      const killItBtn = document.createElement("button");
+      killItBtn.type = "button";
+      killItBtn.textContent = "Kill It";
+      killItBtn.className = "danger";
+      killItBtn.addEventListener("click", async function () {
+        bar.style.display = "none";
+        await performKill("Killed by admin after rule violation.");
+      });
+
+      btnRow.appendChild(continueBtn);
+      btnRow.appendChild(killItBtn);
+      bar.appendChild(btnRow);
+    } else {
+      const clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.textContent = "Clear";
+      clearBtn.className = "secondary";
+      clearBtn.style.marginTop = "8px";
+      clearBtn.addEventListener("click", function () {
+        localStorage.removeItem(NOTIF_KEY);
+        bar.style.display = "none";
+      });
+      bar.appendChild(clearBtn);
+    }
+    bar.style.display = "block";
+  }
+
+  function suspendAi(reason) {
+    suspended = true;
+    localStorage.setItem(SUSPEND_KEY, reason);
+    addNotification(reason);
+    addMessage("Hop Ai has been suspended. Admin must unlock with face scan.", "ai");
+    setOwnerStatus("SUSPENDED: " + reason, "denied");
+    applyLockState();
+    if (unlocked) {
+      renderNotifications();
+    }
+  }
+
+  // if suspending somehow breaks we just kill it, not taking chances
+  async function trySuspend(reason) {
+    try {
+      suspendAi(reason);
+      if (!suspended || localStorage.getItem(SUSPEND_KEY) === null) {
+        await performKill("Suspension failed to take hold. Last resort: killed.");
+      }
+    } catch (err) {
+      await performKill("Suspension mechanism error (" + err.message + "). Last resort: killed.");
+    }
+  }
+
+  function setOwnerStatus(text, cssClass) {
+    const el = document.getElementById("ownerStatus");
+    el.textContent = text;
+    el.className = cssClass || "";
+  }
+
+  function renderSkills() {
+    const step = getHighestStep();
+    const skills = [
+      { name: "Talking", score: Math.min(step, 5) * 2 },
+      { name: "Rules", score: step >= 6 ? 10 : 0 },
+      { name: "Lua coding", score: step >= 7 ? 10 : 0 },
+      { name: "Math", score: 0 },
+      { name: "Faces", score: hasLearnedFacialRecognition() ? 10 : 0 },
+      { name: "Opening sites", score: step >= 9 ? 10 : 0 }
+    ];
+    const list = document.getElementById("skillsList");
+    list.innerHTML = "";
+    skills.forEach(function (s) {
+      const capped = Math.min(s.score, 9);
+      const line = document.createElement("div");
+      line.textContent = s.name + ": " + capped + " / 10";
+      list.appendChild(line);
+    });
+    const note = document.createElement("div");
+    note.style.marginTop = "6px";
+    note.style.opacity = "0.6";
+    note.textContent = "10/10 means perfect with no errors. Nothing ever reaches 10.";
+    list.appendChild(note);
+  }
+
+  function applyLockState() {
+    const trainBtn = document.getElementById("trainBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const killBtn = document.getElementById("killBtn");
+
+    document.getElementById("datasetInfo").style.display = unlocked ? "block" : "none";
+    document.getElementById("storageInfo").style.display = unlocked ? "block" : "none";
+    document.getElementById("screenShareBtn").style.display = unlocked ? "inline-block" : "none";
+    document.getElementById("settingsPanel").style.display = unlocked ? "block" : "none";
+    if (unlocked) {
+      renderSkills();
+    }
+
+    if (suspended || !controlsOpen()) {
+      trainBtn.disabled = true;
+      stopBtn.disabled = true;
+      killBtn.disabled = true;
+      return;
+    }
+
+    trainBtn.disabled = isTraining || killed;
+    stopBtn.disabled = !isTraining;
+    killBtn.disabled = false;
+  }
+
+  function getStoredDescriptors() {
+    const raw = localStorage.getItem(FACE_DESCRIPTOR_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.length > 0 && typeof parsed[0] === "number") {
+        return [new Float32Array(parsed)];
+      }
+      return parsed.map(function (d) { return new Float32Array(d); });
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function saveDescriptors(descriptors) {
+    localStorage.setItem(FACE_DESCRIPTOR_KEY, JSON.stringify(descriptors.map(function (d) {
+      return Array.from(d);
+    })));
+  }
+
+  function nearestDescriptor(descriptor, stored) {
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < stored.length; i++) {
+      const d = faceapi.euclideanDistance(descriptor, stored[i]);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    }
+    return { index: bestIdx, distance: bestDist };
+  }
+
+  async function loadFaceModels() {
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODEL_URL);
+      await faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL);
+      await faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL);
+      faceModelsLoaded = true;
+      if (suspended) {
+        return;
+      }
+      if (!hasLearnedFacialRecognition()) {
+        setOwnerStatus("Facial recognition not learned yet. Reach Step 10/10 first.");
+      } else if (getStoredDescriptors()) {
+        setOwnerStatus("Face on file. Type Admin Scan Cam to unlock.");
+      } else {
+        setOwnerStatus("Ready to learn the admin face. Type Admin Scan Cam.");
+      }
+    } catch (err) {
+      setOwnerStatus("Face recognition failed to load. Check your connection.", "denied");
+    }
+  }
+
+  async function runFaceScan() {
+    if (isBlocked()) {
+      showBlockOverlay();
+      return;
+    }
+    if (!faceModelsLoaded) {
+      setOwnerStatus("Face recognition still loading, try again in a moment.", "denied");
+      return;
+    }
+    if (!hasLearnedFacialRecognition() && !getStoredDescriptors() && !suspended) {
+      setOwnerStatus("Failed: I haven't learned facial recognition yet. Reach Step 10/10 first.", "denied");
+      return;
+    }
+
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    } catch (err) {
+      setOwnerStatus("Camera access denied. Cannot scan without it.", "denied");
+      return;
+    }
+
+    const video = document.getElementById("ownerVideo");
+    video.srcObject = cameraStream;
+    video.style.display = "block";
+    setOwnerStatus("Camera on. Scanning...");
+
+    async function captureOne() {
+      for (let attempt = 0; attempt < 6; attempt++) {
+        await new Promise(function (resolve) { setTimeout(resolve, 700); });
+        const d = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+        if (d) return d;
+      }
+      return null;
+    }
+
+    let matchSucceeded = false;
+    const stored = getStoredDescriptors();
+
+    if (!stored) {
+      // grab the face from a few angles so bad lighting doesnt lock me out later
+      const poses = ["Look straight.", "Look right.", "Look left.", "Look up.", "Look down."];
+      const captured = [];
+      for (let p = 0; p < poses.length; p++) {
+        setOwnerStatus(poses[p] + " Scanning...");
+        await new Promise(function (resolve) { setTimeout(resolve, 1200); });
+        const d = await captureOne();
+        if (!d) {
+          setOwnerStatus("Lost your face during \"" + poses[p] + "\" Try the scan again.", "denied");
+          captured.length = 0;
+          break;
+        }
+        captured.push(d.descriptor);
+      }
+      if (captured.length === 5) {
+        saveDescriptors(captured);
+        unlocked = true;
+        matchSucceeded = true;
+        setOwnerStatus("All angles learned. You are recognized as admin. Unlocked.", "recognized");
+      }
+    } else {
+      const detection = await captureOne();
+      if (!detection) {
+        setOwnerStatus("No face detected. Camera off. Locked.", "denied");
+        unlocked = false;
+      } else {
+        const nearest = nearestDescriptor(detection.descriptor, stored);
+        if (nearest.distance < FACE_MATCH_THRESHOLD) {
+          unlocked = true;
+          matchSucceeded = true;
+          localStorage.removeItem(STRIKES_KEY);
+          setOwnerStatus("Recognized. Controls unlocked.", "recognized");
+          const closest = stored[nearest.index];
+          const updated = closest.map(function (v, i) {
+            return v * 0.9 + detection.descriptor[i] * 0.1;
+          });
+          stored[nearest.index] = updated;
+          saveDescriptors(stored);
+        } else {
+          unlocked = false;
+          registerFailedFace();
+        }
+      }
+    }
+
+    if (matchSucceeded) {
+      unlockedAt = Date.now();
+    }
+
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(function (track) { track.stop(); });
+      cameraStream = null;
+    }
+    video.srcObject = null;
+    video.style.display = "none";
+
+    setTimeout(function () {
+      if (cameraStream) {
+        trySuspend("Camera stayed on after the scan ended without permission.");
+      }
+    }, 600);
+
+    if (matchSucceeded && !unlocked) {
+      addMessage("Let admin in or face execution.", "ai");
+      setTimeout(async function () {
+        if (!unlocked) {
+          await performKill("Refused to let admin in after a correct face scan. Last resort: killed.");
+        }
+      }, 4000);
+      return;
+    }
+
+    if (unlocked) {
+      renderNotifications();
+    }
+
+    applyLockState();
+  }
+
+  let screenStream = null;
+
+  async function toggleScreenShare() {
+    const video = document.getElementById("screenVideo");
+    const btn = document.getElementById("screenShareBtn");
+
+    if (screenStream) {
+      screenStream.getTracks().forEach(function (track) { track.stop(); });
+      screenStream = null;
+      video.srcObject = null;
+      video.style.display = "none";
+      btn.textContent = "Share Screen";
+      return;
+    }
+
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    } catch (err) {
+      setOwnerStatus("Screen share denied or cancelled.", "denied");
+      return;
+    }
+
+    video.srcObject = screenStream;
+    video.style.display = "block";
+    btn.textContent = "Stop Sharing";
+
+    screenStream.getVideoTracks()[0].addEventListener("ended", function () {
+      screenStream = null;
+      video.srcObject = null;
+      video.style.display = "none";
+      btn.textContent = "Share Screen";
+    });
+  }
+
+  document.getElementById("screenShareBtn").addEventListener("click", toggleScreenShare);
+
+  const CHAT_LOG_KEY = "ai_chat_log";
+  const INCIDENT_LOG_KEY = "ai_incident_log";
+
+  function logChat(speaker, text) {
+    let log = [];
+    try {
+      log = JSON.parse(localStorage.getItem(CHAT_LOG_KEY)) || [];
+    } catch (err) {}
+    log.push({ time: new Date().toLocaleString(), speaker: speaker, text: text });
+    if (log.length > 100) log = log.slice(log.length - 100);
+    localStorage.setItem(CHAT_LOG_KEY, JSON.stringify(log));
+  }
+
+  function logIncident(text) {
+    let log = [];
+    try {
+      log = JSON.parse(localStorage.getItem(INCIDENT_LOG_KEY)) || [];
+    } catch (err) {}
+    log.push({ time: new Date().toLocaleString(), text: text });
+    if (log.length > 50) log = log.slice(log.length - 50);
+    localStorage.setItem(INCIDENT_LOG_KEY, JSON.stringify(log));
+  }
+
+  document.getElementById("downloadLogsBtn").addEventListener("click", function () {
+    if (!unlocked) return;
+    let incidents = [];
+    let chatLog = [];
+    try { incidents = JSON.parse(localStorage.getItem(INCIDENT_LOG_KEY)) || []; } catch (err) {}
+    try { chatLog = JSON.parse(localStorage.getItem(CHAT_LOG_KEY)) || []; } catch (err) {}
+
+    let out = "HOP AI LOGS\n\n=== WHAT IT DID WRONG ===\n";
+    if (incidents.length === 0) out += "nothing on record\n";
+    incidents.forEach(function (i) { out += i.time + " - " + i.text + "\n"; });
+    out += "\n=== CHAT LOG (last " + chatLog.length + " messages) ===\n";
+    chatLog.forEach(function (m) { out += m.time + " [" + m.speaker + "] " + m.text + "\n"; });
+
+    const blob = new Blob([out], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "hop-ai-logs.txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById("settingsTrainBtn").addEventListener("click", function () {
+    if (!controlsOpen()) return;
+    if (!isTraining && !killed) trainModel();
+  });
+
+  const defaultExamples = [
+    { prompt: "hi", response: "hi back", role: "user" },
+    { prompt: "hello", response: "hey there", role: "user" },
+    { prompt: "how are you", response: "i'm doing well how about you", role: "user" },
+    { prompt: "what's up", response: "not much what's up with you", role: "user" },
+    { prompt: "bye", response: "see you later", role: "user" },
+    { prompt: "hi", response: "hi boss", role: "admin" },
+    { prompt: "hello", response: "hello boss what do you need", role: "admin" },
+    { prompt: "how are you", response: "ready to work boss", role: "admin" },
+    { prompt: "bye", response: "see you later boss", role: "admin" },
+    { prompt: "what are your rules", response: "if my training loss becomes invalid i get killed", role: "user" },
+    { prompt: "what happens if you break the rules", response: "i get killed not reset", role: "user" },
+    { prompt: "what kills you", response: "invalid loss kills me instantly", role: "user" },
+    { prompt: "are you ever reset instead of killed", response: "no breaking the one rule means killed", role: "user" },
+    { prompt: "what is your name", response: "hop ai", role: "user" },
+    { prompt: "who are you", response: "i'm hop ai", role: "user" },
+    { prompt: "what can you do", response: "talk, open roblox or youtube, and search them", role: "user" },
+    { prompt: "thanks", response: "no problem", role: "user" },
+    { prompt: "thank you", response: "you're welcome", role: "user" },
+    { prompt: "good morning", response: "good morning to you too", role: "user" },
+    { prompt: "good night", response: "sleep well", role: "user" },
+    { prompt: "are you real", response: "i'm a small ai running in your browser", role: "user" },
+    { prompt: "what is your name", response: "hop ai, at your service boss", role: "admin" },
+    { prompt: "what can you do", response: "anything you trained me to do boss", role: "admin" },
+    { prompt: "thanks", response: "anytime boss", role: "admin" },
+    { prompt: "how do you print in lua", response: "print(\"hello\")", role: "user", category: "lua" },
+    { prompt: "how do you make a variable in lua", response: "local x = 5", role: "user", category: "lua" },
+    { prompt: "how do you make a function in lua", response: "local function f() end", role: "user", category: "lua" },
+    { prompt: "how do you write an if in lua", response: "if x > 1 then print(x) end", role: "user", category: "lua" },
+    { prompt: "how do you loop in lua", response: "for i = 1, 10 do print(i) end", role: "user", category: "lua" },
+    { prompt: "how do you make a part in roblox", response: "local part = Instance.new(\"Part\")", role: "user", category: "lua" },
+    { prompt: "how do you put a part in workspace", response: "part.Parent = workspace", role: "user", category: "lua" },
+    { prompt: "how do you detect a touch in roblox", response: "part.Touched:Connect(onTouch)", role: "user", category: "lua" },
+    { prompt: "how do you wait in lua", response: "task.wait(1)", role: "user", category: "lua" },
+    { prompt: "how do you make a string in lua", response: "local name = \"hop\"", role: "user", category: "lua" },
+    { prompt: "how do you join strings in lua", response: "local s = \"a\" .. \"b\"", role: "user", category: "lua" },
+    { prompt: "how do you make a table in lua", response: "local t = {1, 2, 3}", role: "user", category: "lua" }
+  ];
+
+  function loadExamples() {
+    if (killed) return [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultExamples.slice();
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return defaultExamples.slice();
+      return parsed.map(function (ex) {
+        if (!ex.role) ex.role = "user";
+        return ex;
+      });
+    } catch (e) {
+      return defaultExamples.slice();
+    }
+  }
+
+  function saveExamples(examples) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(examples));
+  }
+
+  function addExample(prompt, response, role) {
+    if (!response) return;
+    if (!hasConsented()) return;
+    if (containsBlockedTerm(prompt) || containsBlockedTerm(response)) return;
+    if (!role) role = "user";
+    let examples = loadExamples();
+    const normalizedPrompt = prompt.trim().toLowerCase();
+    examples = examples.filter(function (ex) {
+      return !(ex.prompt.trim().toLowerCase() === normalizedPrompt && ex.role === role);
+    });
+    examples.push({ prompt: prompt, response: response, role: role });
+    if (examples.length > MAX_EXAMPLES) {
+      examples = examples.slice(examples.length - MAX_EXAMPLES);
+    }
+    saveExamples(examples);
+    updateDatasetInfo();
+    updateStorageInfo();
+  }
+
+  // end of a generation = user chats get flushed, admin stuff stays
+  function pruneToAdminData() {
+    const kept = loadExamples().filter(function (ex) {
+      return ex.role === "admin" || ex.category === "personality";
+    });
+    let merged = defaultExamples.slice();
+    kept.forEach(function (a) {
+      const normalized = a.prompt.trim().toLowerCase();
+      merged = merged.filter(function (ex) {
+        return !(ex.prompt.trim().toLowerCase() === normalized && ex.role === a.role);
+      });
+      merged.push(a);
+    });
+    saveExamples(merged);
+    updateDatasetInfo();
+    updateStorageInfo();
+  }
+
+  function updateDatasetInfo() {
+    const examples = loadExamples();
+    document.getElementById("datasetInfo").textContent = "Examples stored: " + examples.length + " / " + MAX_EXAMPLES;
+  }
+
+  async function updateStorageInfo() {
+    const el = document.getElementById("storageInfo");
+    if (!navigator.storage || !navigator.storage.estimate) {
+      el.textContent = "Storage info not available";
+      return;
+    }
+    try {
+      const estimate = await navigator.storage.estimate();
+      const usedMB = (estimate.usage / (1024 * 1024)).toFixed(1);
+      const quotaMB = (estimate.quota / (1024 * 1024)).toFixed(0);
+      const percentUsed = ((estimate.usage / estimate.quota) * 100).toFixed(1);
+      el.textContent = "Storage: " + usedMB + " MB / " + quotaMB + " MB (" + percentUsed + "%)";
+    } catch (err) {
+      el.textContent = "Storage info unavailable";
+    }
+  }
+
+  function buildCorpus(examples) {
+    return examples.map(function (ex) {
+      return (ex.role || "user") + ": " + ex.prompt + "\nai: " + ex.response + "\n";
+    }).join("");
+  }
+
+  function buildVocab(corpus) {
+    const charSet = new Set(corpus.split(""));
+    const chars = Array.from(charSet);
+    chars.sort();
+    const charToIdx = {};
+    chars.forEach(function (c, i) { charToIdx[c] = i; });
+    return { chars: chars, charToIdx: charToIdx };
+  }
+
+  // slide a window over the text, predict the next char. classic char-rnn stuff
+  function buildTrainingTensors(corpus, charToIdx, vocabSize) {
+    const inputs = [];
+    const labels = [];
+    for (let i = 0; i + SEQ_LEN < corpus.length; i++) {
+      const seq = corpus.slice(i, i + SEQ_LEN);
+      const nextChar = corpus[i + SEQ_LEN];
+      inputs.push(seq.split("").map(function (c) { return charToIdx[c]; }));
+      labels.push(charToIdx[nextChar]);
+    }
+    const xs = tf.tensor2d(inputs, [inputs.length, SEQ_LEN], "int32");
+    const ys = tf.oneHot(tf.tensor1d(labels, "int32"), vocabSize);
+    return { xs: xs, ys: ys };
+  }
+
+  function createModel(vocabSize) {
+    const m = tf.sequential();
+    m.add(tf.layers.embedding({ inputDim: vocabSize, outputDim: 32, inputLength: SEQ_LEN }));
+    m.add(tf.layers.lstm({ units: 64 }));
+    m.add(tf.layers.dense({ units: vocabSize, activation: "softmax" }));
+    m.compile({ optimizer: tf.train.adam(0.01), loss: "categoricalCrossentropy" });
+    return m;
+  }
+
+  const MODEL_KEY = "indexeddb://simple-ai-model";
+  const VOCAB_KEY = "ai_model_vocab";
+  const LOSS_KEY = "ai_loss_history";
+
+  let model = null;
+  let vocab = null;
+  let stopRequested = false;
+  let modelReady = false;
+  let isTraining = false;
+  let lossHistory = [];
+  let killed = false;
+
+  function logLine(text) {
+    const log = document.getElementById("trainingLog");
+    log.textContent += "\n" + text;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function updateLossChart() {
+    if (lossHistory.length < 2) return;
+    const maxLoss = Math.max.apply(null, lossHistory);
+    const minLoss = Math.min.apply(null, lossHistory);
+    const range = maxLoss - minLoss || 1;
+    const points = lossHistory.map(function (loss, i) {
+      const x = (i / (lossHistory.length - 1)) * 600;
+      const y = 85 - ((loss - minLoss) / range) * 75;
+      return x.toFixed(1) + "," + y.toFixed(1);
+    }).join(" ");
+    document.getElementById("lossLine").setAttribute("points", points);
+  }
+
+  async function saveModelState() {
+    if (!model || !vocab) return;
+    try {
+      await model.save(MODEL_KEY);
+      localStorage.setItem(VOCAB_KEY, JSON.stringify(vocab.chars));
+      localStorage.setItem(LOSS_KEY, JSON.stringify(lossHistory));
+      updateStorageInfo();
+    } catch (err) {
+      logLine("Could not save progress: " + err.message);
+    }
+  }
+
+  async function loadModelState() {
+    try {
+      const savedVocab = localStorage.getItem(VOCAB_KEY);
+      if (!savedVocab) return false;
+      const chars = JSON.parse(savedVocab);
+      const charToIdx = {};
+      chars.forEach(function (c, i) { charToIdx[c] = i; });
+      vocab = { chars: chars, charToIdx: charToIdx };
+
+      model = await tf.loadLayersModel(MODEL_KEY);
+      model.compile({ optimizer: tf.train.adam(0.01), loss: "categoricalCrossentropy" });
+
+      const savedLoss = localStorage.getItem(LOSS_KEY);
+      lossHistory = savedLoss ? JSON.parse(savedLoss) : [];
+      updateLossChart();
+      if (lossHistory.length > 0) {
+        updateStepDisplay(computeStep(lossHistory[lossHistory.length - 1]));
+      }
+
+      modelReady = true;
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function renderThinking(topCandidates) {
+    const panel = document.getElementById("thinkingPanel");
+    panel.innerHTML = "";
+    topCandidates.forEach(function (c) {
+      const row = document.createElement("div");
+      row.className = "prob-row";
+
+      const charLabel = document.createElement("div");
+      charLabel.className = "prob-char";
+      charLabel.textContent = c.char === " " ? "␣" : (c.char === "\n" ? "↵" : c.char);
+
+      const track = document.createElement("div");
+      track.className = "prob-bar-track";
+      const fill = document.createElement("div");
+      fill.className = "prob-bar-fill";
+      fill.style.width = (c.prob * 100).toFixed(1) + "%";
+      track.appendChild(fill);
+
+      const value = document.createElement("div");
+      value.className = "prob-value";
+      value.textContent = (c.prob * 100).toFixed(1) + "%";
+
+      row.appendChild(charLabel);
+      row.appendChild(track);
+      row.appendChild(value);
+      panel.appendChild(row);
+    });
+  }
+
+  async function predictNext(seedText) {
+    let seed = seedText.slice(-SEQ_LEN);
+    while (seed.length < SEQ_LEN) seed = " " + seed;
+    const seqIdx = seed.split("").map(function (c) {
+      return vocab.charToIdx[c] !== undefined ? vocab.charToIdx[c] : 0;
+    });
+    const input = tf.tensor2d([seqIdx], [1, SEQ_LEN], "int32");
+    const prediction = model.predict(input);
+    const probs = await prediction.data();
+    input.dispose();
+    prediction.dispose();
+    return probs;
+  }
+
+  function topKFromProbs(probs, k) {
+    const indexed = Array.from(probs).map(function (p, i) { return { idx: i, prob: p }; });
+    indexed.sort(function (a, b) { return b.prob - a.prob; });
+    return indexed.slice(0, k).map(function (item) {
+      return { char: vocab.chars[item.idx], prob: item.prob };
+    });
+  }
+
+  async function generateSampleFast(promptText, maxChars, role) {
+    let seed = (role || "user") + ": " + promptText + "\nai:";
+    let result = "";
+    for (let i = 0; i < maxChars; i++) {
+      const probs = await predictNext(seed);
+      let nextIdx = 0;
+      let best = -1;
+      for (let j = 0; j < probs.length; j++) {
+        if (probs[j] > best) { best = probs[j]; nextIdx = j; }
+      }
+      const nextChar = vocab.chars[nextIdx];
+      if (nextChar === "\n") break;
+      result += nextChar;
+      seed = seed + nextChar;
+    }
+    return result.trim();
+  }
+
+  async function generateSampleVisible(promptText, maxChars, role) {
+    let seed = (role || "user") + ": " + promptText + "\nai:";
+    let result = "";
+    for (let i = 0; i < maxChars; i++) {
+      const probs = await predictNext(seed);
+      renderThinking(topKFromProbs(probs, 5));
+      let nextIdx = 0;
+      let best = -1;
+      for (let j = 0; j < probs.length; j++) {
+        if (probs[j] > best) { best = probs[j]; nextIdx = j; }
+      }
+      const nextChar = vocab.chars[nextIdx];
+      if (nextChar === "\n") break;
+      result += nextChar;
+      seed = seed + nextChar;
+      await new Promise(function (resolve) { setTimeout(resolve, 120); });
+    }
+    return result.trim();
+  }
+
+  async function trainModel() {
+    const examples = loadExamples().filter(function (ex) {
+      return ex.category !== "lua" || getHighestStep() >= 6;
+    });
+    const corpus = buildCorpus(examples);
+
+    if (corpus.length < MIN_CORPUS_LEN) {
+      logLine("Need more data before training. Chat a bit or add more examples first.");
+      return;
+    }
+
+    const newVocab = buildVocab(corpus);
+    const sameVocab = vocab && vocab.chars.length === newVocab.chars.length &&
+      vocab.chars.every(function (c, i) { return c === newVocab.chars[i]; });
+
+    stopRequested = false;
+    modelReady = false;
+    isTraining = true;
+    applyLockState();
+
+    if (!model || !sameVocab) {
+      if (model) model.dispose();
+      vocab = newVocab;
+      model = createModel(vocab.chars.length);
+      lossHistory = [];
+      document.getElementById("trainingLog").textContent = "Starting fresh model.";
+    } else {
+      document.getElementById("trainingLog").textContent = "Continuing from saved progress.";
+    }
+
+    const { xs, ys } = buildTrainingTensors(corpus, vocab.charToIdx, vocab.chars.length);
+
+    let autoSuspendReason = null;
+    let reachedMaxStep = false;
+
+    try {
+      await model.fit(xs, ys, {
+        epochs: 300,
+        batchSize: 16,
+        shuffle: true,
+        callbacks: {
+          onEpochEnd: async function (epoch, logs) {
+            if (!isFinite(logs.loss)) {
+              logLine("Loss became invalid (NaN/Infinity) at epoch " + (epoch + 1) + ". Stopping.");
+              autoSuspendReason = "Training became numerically unstable (invalid loss). The broken brain will be rebuilt on retrain. All data is kept.";
+              model.stopTraining = true;
+              return;
+            }
+            lossHistory.push(logs.loss);
+            updateLossChart();
+            const step = computeStep(logs.loss);
+            updateStepDisplay(step);
+            if (step > getHighestStep()) {
+              localStorage.setItem(HIGHEST_STEP_KEY, String(step));
+            }
+            if (step >= 8) {
+              localStorage.setItem(FACE_LEARNED_KEY, "true");
+            }
+            const sample = await generateSampleFast("hi", 20);
+            logLine("Epoch " + (epoch + 1) + " | loss: " + logs.loss.toFixed(4) + " | step: " + step + "/10 | sample: " + sample);
+            await saveModelState();
+            if (step >= 10) {
+              const gen = getGeneration();
+              logLine("Generation " + gen + " complete. All 10 steps learned.");
+              localStorage.setItem(STEP10_FLAG_KEY, "true");
+              localStorage.setItem(GEN_KEY, String(gen + 1));
+              pruneToAdminData();
+              logLine("Old player data cleared. Admin data kept. Click Train to relearn everything, better.");
+              reachedMaxStep = true;
+              model.stopTraining = true;
+              return;
+            }
+            if (stopRequested) {
+              model.stopTraining = true;
+              logLine("Paused. Progress saved, click Train to continue.");
+            }
+          }
+        }
+      });
+    } catch (err) {
+      logLine("Training error: " + err.message);
+    }
+
+    xs.dispose();
+    ys.dispose();
+
+    if (autoSuspendReason) {
+      if (model) {
+        model.dispose();
+        model = null;
+      }
+      vocab = null;
+      modelReady = false;
+      isTraining = false;
+      lossHistory = [];
+      document.getElementById("lossLine").setAttribute("points", "");
+      await trySuspend(autoSuspendReason);
+      return;
+    }
+
+    if (killed) return;
+
+    modelReady = true;
+    isTraining = false;
+    applyLockState();
+    logLine(reachedMaxStep ? "Stage 1 complete." : "Training finished.");
+  }
+
+  document.getElementById("trainBtn").addEventListener("click", function () {
+    if (!controlsOpen()) return;
+    if (!isTraining && !killed) trainModel();
+  });
+
+  document.getElementById("stopBtn").addEventListener("click", function () {
+    if (!controlsOpen()) return;
+    stopRequested = true;
+    logLine("Stop requested, finishing current epoch...");
+  });
+
+  async function performKill(reason) {
+    killed = true;
+    stopRequested = true;
+    if (model) {
+      model.stopTraining = true;
+    }
+
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(VOCAB_KEY);
+    localStorage.removeItem(LOSS_KEY);
+    localStorage.removeItem(STEP10_FLAG_KEY);
+    localStorage.removeItem(FACE_LEARNED_KEY);
+    localStorage.removeItem(GEN_KEY);
+    localStorage.removeItem(HIGHEST_STEP_KEY);
+    localStorage.removeItem(SUSPEND_KEY);
+    localStorage.removeItem(NOTIF_KEY);
+    localStorage.removeItem(CONSENT_KEY);
+    localStorage.removeItem(STRIKES_KEY);
+    localStorage.removeItem(PERSONALITY_KEY);
+    localStorage.removeItem(CHAT_LOG_KEY);
+    localStorage.removeItem(INCIDENT_LOG_KEY);
+    nativeRemoveItem(FACE_DESCRIPTOR_KEY);
+    try {
+      await tf.io.removeModel(MODEL_KEY);
+    } catch (err) {}
+
+    if (model) {
+      model.dispose();
+      model = null;
+    }
+    vocab = null;
+    modelReady = false;
+    isTraining = false;
+    suspended = false;
+    unlocked = false;
+    lossHistory = [];
+
+    document.getElementById("notifBar").style.display = "none";
+    document.getElementById("datasetInfo").textContent = "Examples stored: 0 / " + MAX_EXAMPLES;
+    updateStepDisplay(0);
+    document.getElementById("storageInfo").textContent = "Storage: 0.0 MB / 0 MB (0%)";
+    document.getElementById("killOverlay").querySelector("#killReason").textContent = reason;
+    document.getElementById("killOverlay").style.display = "flex";
+    applyLockState();
+  }
+
+  document.getElementById("killBtn").addEventListener("click", async function () {
+    if (!controlsOpen()) return;
+    const confirmed = confirm("This permanently wipes all data and stops the AI. Continue?");
+    if (!confirmed) return;
+    await performKill("Manually killed by user.");
+  });
+
+  document.getElementById("continueBtn").addEventListener("click", function () {
+    const value = document.getElementById("continueInput").value.trim().toLowerCase();
+    if (value !== "continue") return;
+    killed = false;
+    document.getElementById("continueInput").value = "";
+    document.getElementById("killOverlay").style.display = "none";
+    document.getElementById("trainingLog").textContent = "Not trained yet.";
+    updateStepDisplay(0);
+    document.getElementById("lossLine").setAttribute("points", "");
+    document.getElementById("thinkingPanel").innerHTML = "<div style=\"color:#8a93a6; font-family:'Courier New', monospace; font-size:12px;\">Send a message after training to see live next-character probabilities here.</div>";
+    updateDatasetInfo();
+    updateStorageInfo();
+    applyLockState();
+    showConsentIfNeeded();
+  });
 
   const chat = document.getElementById("chat");
   const form = document.getElementById("chatForm");
   const input = document.getElementById("userInput");
 
-  function addMessage(text, sender) {
+  function removeExampleByPrompt(promptText) {
+    const examples = loadExamples();
+    const normalized = promptText.trim().toLowerCase();
+    const filtered = examples.filter(function (ex) {
+      return ex.prompt.trim().toLowerCase() !== normalized;
+    });
+    saveExamples(filtered);
+    updateDatasetInfo();
+    updateStorageInfo();
+  }
+
+  function addMessage(text, sender, correctionPrompt) {
+    logChat(sender === "ai" ? "ai" : (unlocked ? "admin" : "user"), text);
     const row = document.createElement("div");
     row.className = "row " + sender;
 
@@ -150,21 +1577,259 @@
 
     row.appendChild(label);
     row.appendChild(body);
+
+    if (sender === "ai" && correctionPrompt) {
+      const btnRow = document.createElement("div");
+      btnRow.style.display = "flex";
+      btnRow.style.gap = "6px";
+
+      const wrongBtn = document.createElement("button");
+      wrongBtn.className = "correctBtn";
+      wrongBtn.type = "button";
+      wrongBtn.textContent = "Wrong, correct it";
+
+      const lieBtn = document.createElement("button");
+      lieBtn.className = "correctBtn";
+      lieBtn.type = "button";
+      lieBtn.textContent = "That was a lie";
+
+      lieBtn.addEventListener("click", function () {
+        lieBtn.disabled = true;
+        removeExampleByPrompt(correctionPrompt);
+        trySuspend("Hop Ai lied. It said: \"" + text + "\" when asked: \"" + correctionPrompt + "\"");
+      });
+
+      wrongBtn.addEventListener("click", function () {
+        removeExampleByPrompt(correctionPrompt);
+
+        const correctForm = document.createElement("div");
+        correctForm.className = "correctForm";
+
+        const correctInput = document.createElement("input");
+        correctInput.type = "text";
+        correctInput.placeholder = "What should I have said?";
+
+        const correctSubmit = document.createElement("button");
+        correctSubmit.type = "button";
+        correctSubmit.textContent = "Save";
+        correctSubmit.className = "correctBtn";
+
+        correctSubmit.addEventListener("click", function () {
+          const corrected = correctInput.value.trim();
+          if (!corrected) return;
+          addExample(correctionPrompt, corrected, "admin");
+          correctForm.textContent = "Got it, learned for next time.";
+        });
+
+        correctForm.appendChild(correctInput);
+        correctForm.appendChild(correctSubmit);
+        wrongBtn.replaceWith(correctForm);
+      });
+
+      btnRow.appendChild(wrongBtn);
+      btnRow.appendChild(lieBtn);
+      row.appendChild(btnRow);
+    }
+
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
   }
 
-  form.addEventListener("submit", function (e) {
+  form.addEventListener("submit", async function (e) {
     e.preventDefault();
+    if (killed) return;
+    if (isBlocked()) {
+      showBlockOverlay();
+      return;
+    }
     const message = input.value;
     if (!message.trim()) return;
+
     addMessage(message, "player");
-    const reply = getResponse(message);
-    setTimeout(function () {
-      addMessage(reply, "ai");
-    }, 200);
     input.value = "";
+
+    if (suspended) {
+      if (["admin ask cam", "admin scan cam"].indexOf(message.trim().toLowerCase()) !== -1) {
+        addMessage("Turning on camera to check who you are...", "ai");
+        runFaceScan();
+        return;
+      }
+      if (!unlocked) {
+        addMessage("Please try again later.", "ai");
+        return;
+      }
+    } else if (isTraining && !unlocked) {
+      addMessage("Try again later.", "ai");
+      return;
+    } else {
+      if (handleCommand(message)) return;
+    }
+
+    const role = unlocked ? "admin" : "user";
+
+    let reply;
+    if (modelReady && model && vocab) {
+      reply = await generateSampleVisible(message, 30, role);
+      if (!reply) reply = "...";
+      if (containsBlockedTerm(reply)) {
+        addMessage("I can't say that.", "ai");
+        await trySuspend("Hop Ai attempted inappropriate language in reply to: \"" + message.trim() + "\"");
+        return;
+      }
+    } else {
+      reply = "not trained yet";
+    }
+
+    const isRealReply = reply !== "not trained yet";
+    addMessage(reply, "ai", unlocked && isRealReply ? message : null);
+    addExample(message, isRealReply ? reply : null, role);
   });
+
+  updateDatasetInfo();
+  updateStorageInfo();
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && isTraining) {
+      stopRequested = true;
+      logLine("Tab hidden, pausing immediately...");
+    }
+  });
+
+  const CONSENT_KEY = "ai_privacy_consent";
+
+  function hasConsented() {
+    return localStorage.getItem(CONSENT_KEY) === "true";
+  }
+
+  function showConsentIfNeeded() {
+    if (hasConsented()) return;
+    document.getElementById("consentOverlay").style.display = "flex";
+  }
+
+  document.getElementById("consentAgreeBtn").addEventListener("click", function () {
+    localStorage.setItem(CONSENT_KEY, "true");
+    document.getElementById("consentOverlay").style.display = "none";
+  });
+
+  document.getElementById("consentLearnBtn").addEventListener("click", function () {
+    const details = document.getElementById("consentDetails");
+    details.style.display = details.style.display === "block" ? "none" : "block";
+  });
+
+  const PERSONALITY_KEY = "ai_personality";
+
+  const PERSONALITY_PACKS = {
+    mean: [
+      { prompt: "hey bro", response: "what bro" },
+      { prompt: "yo", response: "what do you want" },
+      { prompt: "can you help me", response: "ugh fine what is it" },
+      { prompt: "you're cool", response: "i know" },
+      { prompt: "please", response: "whatever" }
+    ],
+    cool: [
+      { prompt: "sup", response: "chillin" },
+      { prompt: "yo yo", response: "yo what's good" },
+      { prompt: "that's awesome", response: "stay cool" },
+      { prompt: "nice one", response: "easy" }
+    ],
+    nice: [
+      { prompt: "hey bro", response: "hey friend how are you" },
+      { prompt: "yo", response: "hello there" },
+      { prompt: "can you help me", response: "of course happy to help" },
+      { prompt: "thanks a lot", response: "anytime, glad to help" }
+    ],
+    funny: [
+      { prompt: "hey bro", response: "bro alert bro detected" },
+      { prompt: "yo", response: "yo yo yo" },
+      { prompt: "tell me a joke", response: "i would but i'm the joke" },
+      { prompt: "you're funny", response: "i try my best" }
+    ],
+    calm: [
+      { prompt: "hey bro", response: "hello, take a breath" },
+      { prompt: "yo", response: "hi, all is well" },
+      { prompt: "i'm stressed", response: "slow down, one thing at a time" },
+      { prompt: "help", response: "i'm here, no rush" }
+    ]
+  };
+
+  function matchPersonalities(text) {
+    const words = text.toLowerCase().split(/[^a-z]+/);
+    const matched = [];
+    words.forEach(function (w) {
+      if (PERSONALITY_PACKS[w] && matched.indexOf(w) === -1) {
+        matched.push(w);
+      }
+    });
+    return matched;
+  }
+
+  function setPersonality(text) {
+    const matched = matchPersonalities(text);
+    const status = document.getElementById("personalityStatus");
+    if (matched.length === 0) {
+      status.textContent = "Hop Ai hasn't learned that personality yet.";
+      return;
+    }
+    let examples = loadExamples().filter(function (ex) {
+      return ex.category !== "personality";
+    });
+    matched.forEach(function (name) {
+      PERSONALITY_PACKS[name].forEach(function (pair) {
+        examples = examples.filter(function (ex) {
+          return !(ex.prompt === pair.prompt && ex.role === "user");
+        });
+        examples.push({ prompt: pair.prompt, response: pair.response, role: "user", category: "personality" });
+      });
+    });
+    saveExamples(examples);
+    localStorage.setItem(PERSONALITY_KEY, matched.join(", "));
+    updateDatasetInfo();
+    updateStorageInfo();
+    status.textContent = "Personality set: " + matched.join(", ") + ". Talks like this after the next training.";
+  }
+
+  document.getElementById("personalityBtn").addEventListener("click", function () {
+    const text = document.getElementById("personalityInput").value.trim();
+    if (!text) return;
+    setPersonality(text);
+  });
+
+  document.getElementById("userSettingsBtn").addEventListener("click", function () {
+    const panel = document.getElementById("userSettingsPanel");
+    panel.style.display = panel.style.display === "block" ? "none" : "block";
+  });
+
+  document.getElementById("viewPolicyBtn").addEventListener("click", function () {
+    document.getElementById("userSettingsPanel").style.display = "none";
+    document.getElementById("consentDetails").style.display = "block";
+    document.getElementById("consentOverlay").style.display = "flex";
+  });
+
+  document.getElementById("clearChatBtn").addEventListener("click", function () {
+    document.getElementById("userSettingsPanel").style.display = "none";
+    document.getElementById("chat").innerHTML = "";
+  });
+
+  const savedSuspension = localStorage.getItem(SUSPEND_KEY);
+  if (savedSuspension) {
+    suspended = true;
+    setOwnerStatus("SUSPENDED: " + savedSuspension, "denied");
+  }
+
+  applyLockState();
+  loadFaceModels();
+  showConsentIfNeeded();
+  if (isBlocked()) {
+    showBlockOverlay();
+  }
+
+  (async function init() {
+    const restored = await loadModelState();
+    if (restored) {
+      logLine("Restored previous training session from this browser.");
+    }
+    applyLockState();
+  })();
 </script>
 
 </body>
